@@ -13,6 +13,7 @@ MSMEs face severe cash flow issues due to delayed invoice payments (60-90 days).
 ## 💡 Solution
 
 TrustFlow uses blockchain technology to:
+
 - **Tokenize invoices** as ERC-721 NFTs
 - **Verify buyers** via wallet signature or web confirmation (no wallet needed)
 - **Calculate trust scores** using rule-based algorithms
@@ -52,20 +53,21 @@ TrustFlow uses blockchain technology to:
 
 ## 🔧 Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Blockchain | Polygon Amoy Testnet |
-| Smart Contracts | Solidity + Hardhat |
-| Backend | Node.js + Express |
-| Frontend | React.js + Vite |
-| Wallet | MetaMask |
-| Storage | IPFS (Pinata) |
+| Layer           | Technology           |
+| --------------- | -------------------- |
+| Blockchain      | Polygon Amoy Testnet |
+| Smart Contracts | Solidity + Hardhat   |
+| Backend         | Node.js + Express    |
+| Frontend        | React.js + Vite      |
+| Wallet          | MetaMask             |
+| Storage         | IPFS (Pinata)        |
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js v18+
 - MetaMask browser extension
 - Git
@@ -136,14 +138,16 @@ TrustFlow/
 ## 🔐 Key Features
 
 ### Dual-Mode Buyer Verification
-| Mode | Description |
-|------|-------------|
-| **Wallet Signature** | Buyer signs with MetaMask |
+
+| Mode                 | Description                          |
+| -------------------- | ------------------------------------ |
+| **Wallet Signature** | Buyer signs with MetaMask            |
 | **Web Confirmation** | Click secure link (no wallet needed) |
 
 Both produce an **immutable on-chain verification hash**.
 
 ### Trust Score Formula
+
 ```
 Trust Score (0-100) =
   40% × MSME past success rate
@@ -153,6 +157,7 @@ Trust Score (0-100) =
 ```
 
 ### Invoice Status Flow
+
 ```
 CREATED → BUYER_VERIFIED → LISTED → FUNDED → SETTLED
                                          ↓
@@ -164,6 +169,7 @@ CREATED → BUYER_VERIFIED → LISTED → FUNDED → SETTLED
 ## 👥 User Flows
 
 ### Seller (MSME)
+
 1. Register/Login → Dashboard
 2. Create Invoice (amount, due date, buyer email/wallet)
 3. Share verification link with buyer
@@ -171,12 +177,14 @@ CREATED → BUYER_VERIFIED → LISTED → FUNDED → SETTLED
 5. Receive instant liquidity when funded
 
 ### Buyer
+
 1. Receive verification link via email
 2. Review invoice details
 3. Confirm via web (no wallet) or sign with wallet
 4. Pay on due date to escrow
 
 ### Investor
+
 1. Browse marketplace (filter by trust score)
 2. Review invoice details and expected yield
 3. Fund invoice → funds go to escrow → released to seller
@@ -195,13 +203,12 @@ CREATED → BUYER_VERIFIED → LISTED → FUNDED → SETTLED
 
 ## 📜 Smart Contracts
 
-| Contract | Purpose |
-|----------|---------|
-| `InvoiceNFT.sol` | ERC-721 tokens representing invoices |
-| `Escrow.sol` | Holds investor funds, handles settlement |
-| `TrustRegistry.sol` | Stores verification hashes on-chain |
-|a|b|
-
+| Contract            | Purpose                                  |
+| ------------------- | ---------------------------------------- |
+| `InvoiceNFT.sol`    | ERC-721 tokens representing invoices     |
+| `Escrow.sol`        | Holds investor funds, handles settlement |
+| `TrustRegistry.sol` | Stores verification hashes on-chain      |
+| a                   | b                                        |
 
 ---
 
@@ -230,6 +237,7 @@ curl http://localhost:3001/api/health
 ## 👨‍💻 Author
 
 **Govind Suthar**
+
 - GitHub: [@govind-32](https://github.com/govind-32)
 
 ---
@@ -237,3 +245,5 @@ curl http://localhost:3001/api/health
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+Mayur
