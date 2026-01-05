@@ -5,9 +5,10 @@ function Landing() {
         <div className="page">
             {/* Hero Section */}
             <section className="container" style={{ padding: '60px 16px', textAlign: 'center' }}>
-                <h1 style={{ fontSize: '36px', marginBottom: '16px' }}>
-                    Get Paid Early on Your Invoices
-                </h1>
+               <h1 style={{ fontSize: '36px', marginBottom: '16px' }}>
+               Get Paid Early on Your Invoices 🚀
+               </h1>
+
                 <p style={{ fontSize: '18px', maxWidth: '600px', margin: '0 auto 32px' }}>
                     Turn your verified invoices into instant liquidity. No collateral required.
                     Blockchain-secured, transparent, and fast.
