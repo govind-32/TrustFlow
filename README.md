@@ -31,19 +31,19 @@ TrustFlow uses blockchain technology to:
        │                   │                   │
        ▼                   ▼                   ▼
 ┌─────────────────────────────────────────────────────┐
-│                    React Frontend                    │
+│                    React Frontend                   │
 │         (Landing, Dashboards, Marketplace)          │
 └───────────────────────┬─────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────┐
-│                   Node.js Backend                    │
+│                   Node.js Backend                   │
 │        (Auth, Invoice API, Trust Score Engine)      │
 └───────────────────────┬─────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────┐
-│               Smart Contracts (Solidity)             │
+│               Smart Contracts (Solidity)            │
 │         InvoiceNFT │ Escrow │ TrustRegistry         │
 └─────────────────────────────────────────────────────┘
 ```
@@ -201,6 +201,7 @@ CREATED → BUYER_VERIFIED → LISTED → FUNDED → SETTLED
 | `Escrow.sol` | Holds investor funds, handles settlement |
 | `TrustRegistry.sol` | Stores verification hashes on-chain |
 |a|b|
+
 
 ---
 
