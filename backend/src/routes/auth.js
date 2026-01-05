@@ -1,13 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'trustflow-secret-key';
+const { Users, SellerProfiles, InvestorProfiles, AuditLogs } = require('../models');
 
-// In-memory user storage (demo)
-const users = new Map();
+const JWT_SECRET = process.env.JWT_SECRET || 'trustflow-secret-key';
 
 /**
  * POST /auth/register
@@ -15,44 +13,71 @@ const users = new Map();
  */
 router.post('/register', async (req, res) => {
     try {
-        const { username, password, role, email } = req.body;
+        const { username, password, role, email, phone } = req.body;
 
         if (!username || !password || !role) {
             return res.status(400).json({ error: 'Username, password, and role required' });
         }
 
-        if (!['seller', 'investor'].includes(role)) {
+        if (!['seller', 'investor'].includes(role.toLowerCase())) {
             return res.status(400).json({ error: 'Role must be seller or investor' });
         }
 
-        if (users.has(username)) {
+        // Check if username exists
+        const existingUser = await Users.findByUsername(username);
+        if (existingUser) {
             return res.status(400).json({ error: 'Username already exists' });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const userId = uuidv4();
+        const passwordHash = await bcrypt.hash(password, 10);
 
-        const user = {
-            id: userId,
+        // Create user
+        const user = await Users.create({
+            role: role.toUpperCase(),
             username,
-            password: hashedPassword,
-            role,
             email: email || null,
-            walletAddress: null,
-            trustScore: role === 'seller' ? 50 : null,
-            createdAt: new Date().toISOString()
-        };
+            phone: phone || null,
+            passwordHash,
+            walletAddress: null
+        });
 
-        users.set(username, user);
+        // Create profile based on role
+        if (role.toLowerCase() === 'seller') {
+            await SellerProfiles.create({
+                userId: user.id,
+                businessName: null,
+                gstNumber: null,
+                industry: null
+            });
+        } else {
+            await InvestorProfiles.create({
+                userId: user.id,
+                riskPreference: 'MEDIUM'
+            });
+        }
 
-        const token = jwt.sign({ userId, username, role }, JWT_SECRET, { expiresIn: '24h' });
+        // Audit log
+        await AuditLogs.create({
+            entityType: 'USER',
+            entityId: user.id,
+            action: 'USER_REGISTERED',
+            performedBy: 'system',
+            metadata: { role: user.role }
+        });
+
+        const token = jwt.sign(
+            { userId: user.id, username, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
 
         res.status(201).json({
             message: 'User registered successfully',
             token,
-            user: { id: userId, username, role, trustScore: user.trustScore }
+            user: { id: user.id, username, role: user.role }
         });
     } catch (error) {
+        console.error('Register error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -69,12 +94,12 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Username and password required' });
         }
 
-        const user = users.get(username);
+        const user = await Users.findByUsername(username);
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const validPassword = await bcrypt.compare(password, user.password);
+        const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -85,6 +110,14 @@ router.post('/login', async (req, res) => {
             { expiresIn: '24h' }
         );
 
+        // Get profile data
+        let profile = null;
+        if (user.role === 'SELLER') {
+            profile = await SellerProfiles.findByUserId(user.id);
+        } else if (user.role === 'INVESTOR') {
+            profile = await InvestorProfiles.findByUserId(user.id);
+        }
+
         res.json({
             message: 'Login successful',
             token,
@@ -92,11 +125,12 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 username: user.username,
                 role: user.role,
-                walletAddress: user.walletAddress,
-                trustScore: user.trustScore
+                walletAddress: user.wallet_address,
+                trustScore: profile?.trust_score || null
             }
         });
     } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -113,16 +147,20 @@ router.post('/link-wallet', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Wallet address required' });
         }
 
-        const user = users.get(req.user.username);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
+        const user = await Users.linkWallet(req.user.userId, walletAddress);
 
-        user.walletAddress = walletAddress;
+        // Audit log
+        await AuditLogs.create({
+            entityType: 'USER',
+            entityId: user.id,
+            action: 'WALLET_LINKED',
+            performedBy: user.id,
+            metadata: { walletAddress }
+        });
 
         res.json({
             message: 'Wallet linked successfully',
-            walletAddress
+            walletAddress: user.wallet_address
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -133,21 +171,33 @@ router.post('/link-wallet', authenticateToken, async (req, res) => {
  * GET /auth/me
  * Get current user profile
  */
-router.get('/me', authenticateToken, (req, res) => {
-    const user = users.get(req.user.username);
-    if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-    }
+router.get('/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await Users.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
-    res.json({
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        walletAddress: user.walletAddress,
-        trustScore: user.trustScore,
-        createdAt: user.createdAt
-    });
+        let profile = null;
+        if (user.role === 'SELLER') {
+            profile = await SellerProfiles.findByUserId(user.id);
+        } else if (user.role === 'INVESTOR') {
+            profile = await InvestorProfiles.findByUserId(user.id);
+        }
+
+        res.json({
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            email: user.email,
+            walletAddress: user.wallet_address,
+            isWalletLinked: user.is_wallet_linked,
+            trustScore: profile?.trust_score || null,
+            createdAt: user.created_at
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 /**
@@ -172,6 +222,5 @@ function authenticateToken(req, res, next) {
 
 // Export middleware for use in other routes
 router.authenticateToken = authenticateToken;
-router.users = users;
 
 module.exports = router;

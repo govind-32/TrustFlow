@@ -7,6 +7,7 @@ import Register from './pages/Register'
 import SellerDashboard from './pages/seller/Dashboard'
 import CreateInvoice from './pages/seller/CreateInvoice'
 import SellerInvoices from './pages/seller/Invoices'
+import SellerProfile from './pages/seller/Profile'
 import InvestorDashboard from './pages/investor/Dashboard'
 import InvestorPortfolio from './pages/investor/Portfolio'
 import BuyerAccess from './pages/buyer/Access'
@@ -53,6 +54,7 @@ function App() {
                 <Route path="/seller" element={<SellerDashboard user={user} wallet={wallet} />} />
                 <Route path="/seller/create" element={<CreateInvoice user={user} />} />
                 <Route path="/seller/invoices" element={<SellerInvoices user={user} />} />
+                <Route path="/seller/profile" element={<SellerProfile user={user} />} />
 
                 {/* Investor Routes */}
                 <Route path="/investor" element={<InvestorDashboard user={user} wallet={wallet} />} />
@@ -67,3 +69,4 @@ function App() {
 }
 
 export default App
+

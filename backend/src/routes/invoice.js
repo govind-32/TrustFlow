@@ -2,25 +2,23 @@ const express = require('express');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
-const authRoutes = require('./auth');
-const msmeRoutes = require('./msme');
-const trustScoreService = require('../services/trustScore');
 
-// In-memory invoice storage (demo)
-const invoices = new Map();
-const verificationTokens = new Map();
+const authRoutes = require('./auth');
+const { Invoices, SellerProfiles, BuyerProfiles, BuyerConfirmations, TrustScores, Investments, AuditLogs } = require('../models');
+const trustScoreService = require('../services/trustScore');
 
 /**
  * POST /invoice/create
  * Create new invoice
  */
-router.post('/create', authRoutes.authenticateToken, (req, res) => {
+router.post('/create', authRoutes.authenticateToken, async (req, res) => {
     try {
-        const { amount, dueDate, buyerEmail, buyerWallet, description } = req.body;
-        const user = authRoutes.users.get(req.user.username);
+        const { amount, dueDate, buyerEmail, buyerWallet, description, currency } = req.body;
 
-        if (!user || user.role !== 'seller') {
-            return res.status(403).json({ error: 'Only sellers can create invoices' });
+        // Get seller profile
+        const sellerProfile = await SellerProfiles.findByUserId(req.user.userId);
+        if (!sellerProfile) {
+            return res.status(403).json({ error: 'Seller profile not found. Please register as MSME first.' });
         }
 
         if (!amount || !dueDate) {
@@ -31,48 +29,51 @@ router.post('/create', authRoutes.authenticateToken, (req, res) => {
             return res.status(400).json({ error: 'Buyer email or wallet required' });
         }
 
-        const invoiceId = `INV-${Date.now().toString(36).toUpperCase()}`;
-        const verificationToken = uuidv4();
+        const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}`;
 
-        const invoice = {
-            id: invoiceId,
-            sellerId: user.id,
-            sellerUsername: user.username,
-            sellerWallet: user.walletAddress,
-            amount: parseFloat(amount),
-            dueDate,
+        // Create invoice in database
+        const invoice = await Invoices.create({
+            invoiceNumber,
+            sellerId: sellerProfile.id,
             buyerEmail: buyerEmail || null,
             buyerWallet: buyerWallet || null,
-            description: description || '',
-            ipfsHash: null,
-            status: 'CREATED',
-            trustScore: null,
-            trustHash: null,
-            verificationHash: null,
-            verificationType: null,
-            verificationToken,
-            tokenId: null,
-            investor: null,
-            fundedAmount: null,
-            fundedAt: null,
-            settledAt: null,
-            createdAt: new Date().toISOString()
-        };
+            amount: parseFloat(amount),
+            currency: currency || 'ETH',
+            dueDate,
+            description: description || null,
+            ipfsHash: null
+        });
 
-        invoices.set(invoiceId, invoice);
-        verificationTokens.set(verificationToken, invoiceId);
+        // Ensure buyer profile exists
+        if (buyerEmail) {
+            await BuyerProfiles.findOrCreate(buyerEmail);
+        }
 
-        // Generate verification link for buyer
-        const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify/${verificationToken}`;
+        // Audit log
+        await AuditLogs.create({
+            entityType: 'INVOICE',
+            entityId: invoice.id,
+            action: 'INVOICE_CREATED',
+            performedBy: req.user.userId,
+            metadata: { amount, buyerEmail, buyerWallet }
+        });
+
+        // Generate verification link
+        const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify/${invoice.id}`;
 
         res.status(201).json({
             message: 'Invoice created',
             invoice: {
-                ...invoice,
+                id: invoice.id,
+                invoiceNumber: invoice.invoice_number,
+                amount: invoice.amount,
+                dueDate: invoice.due_date,
+                status: invoice.status,
                 verificationLink
             }
         });
     } catch (error) {
+        console.error('Create invoice error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -81,47 +82,57 @@ router.post('/create', authRoutes.authenticateToken, (req, res) => {
  * GET /invoice/:id
  * Get invoice by ID
  */
-router.get('/:id', (req, res) => {
-    const invoice = invoices.get(req.params.id);
+router.get('/:id', async (req, res) => {
+    try {
+        const invoice = await Invoices.findById(req.params.id);
 
-    if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        res.json(invoice);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-
-    res.json(invoice);
 });
 
 /**
- * GET /verify/:token
- * Get invoice by verification token (for buyer web confirmation)
+ * GET /verify/:id
+ * Get invoice for buyer verification
  */
-router.get('/verify/:token', (req, res) => {
-    const invoiceId = verificationTokens.get(req.params.token);
+router.get('/verify/:id', async (req, res) => {
+    try {
+        const invoice = await Invoices.findById(req.params.id);
 
-    if (!invoiceId) {
-        return res.status(404).json({ error: 'Invalid verification link' });
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invalid verification link' });
+        }
+
+        // Get seller info
+        const seller = await SellerProfiles.findByUserId(invoice.seller_id);
+
+        res.json({
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoice_number,
+            amount: invoice.amount,
+            dueDate: invoice.due_date,
+            sellerName: seller?.business_name || 'Unknown',
+            description: invoice.description,
+            status: invoice.status
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-
-    const invoice = invoices.get(invoiceId);
-
-    res.json({
-        invoiceId: invoice.id,
-        amount: invoice.amount,
-        dueDate: invoice.dueDate,
-        sellerName: invoice.sellerUsername,
-        description: invoice.description,
-        status: invoice.status
-    });
 });
 
 /**
  * POST /invoice/:id/verify-web
  * Off-chain web confirmation (no wallet needed)
  */
-router.post('/:id/verify-web', (req, res) => {
+router.post('/:id/verify-web', async (req, res) => {
     try {
-        const { token, buyerEmail } = req.body;
-        const invoice = invoices.get(req.params.id);
+        const { buyerEmail } = req.body;
+        const invoice = await Invoices.findById(req.params.id);
 
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
@@ -131,30 +142,52 @@ router.post('/:id/verify-web', (req, res) => {
             return res.status(400).json({ error: 'Invoice already verified or processed' });
         }
 
-        // Verify token matches
-        const expectedInvoiceId = verificationTokens.get(token);
-        if (expectedInvoiceId !== invoice.id) {
-            return res.status(403).json({ error: 'Invalid verification token' });
-        }
-
         // Generate confirmation hash
         const platformSecret = process.env.PLATFORM_SECRET || 'trustflow-platform-secret';
         const confirmationData = `${invoice.id}|${buyerEmail}|${Date.now()}|${platformSecret}`;
         const confirmationHash = crypto.createHash('sha256').update(confirmationData).digest('hex');
 
         // Calculate trust score
-        const trustScore = trustScoreService.calculateScore(invoice.sellerId, invoice.amount);
+        const trustScore = trustScoreService.calculateScore(invoice.seller_id, invoice.amount);
         const trustHash = crypto.createHash('sha256')
             .update(`${invoice.id}|${trustScore}`)
             .digest('hex');
 
-        // Update invoice
-        invoice.status = 'BUYER_VERIFIED';
-        invoice.verificationHash = confirmationHash;
-        invoice.verificationType = 'WEB_CONFIRMATION';
-        invoice.trustScore = trustScore;
-        invoice.trustHash = trustHash;
-        invoice.buyerEmail = buyerEmail;
+        // Update invoice status
+        await Invoices.updateStatus(invoice.id, 'BUYER_VERIFIED');
+        await Invoices.setTrustScore(invoice.id, trustScore, trustHash);
+
+        // Create buyer confirmation record
+        await BuyerConfirmations.create({
+            invoiceId: invoice.id,
+            method: 'EMAIL',
+            confirmationHash,
+            buyerSignature: null
+        });
+
+        // Save trust score history
+        const seller = await SellerProfiles.findByUserId(invoice.seller_id);
+        await TrustScores.create({
+            invoiceId: invoice.id,
+            sellerId: seller?.id,
+            buyerEmail,
+            score: trustScore,
+            breakdown: {
+                sellerHistory: 40,
+                buyerReputation: 25,
+                invoiceSize: 20,
+                penalties: 15
+            }
+        });
+
+        // Audit log
+        await AuditLogs.create({
+            entityType: 'INVOICE',
+            entityId: invoice.id,
+            action: 'INVOICE_VERIFIED_WEB',
+            performedBy: buyerEmail,
+            metadata: { confirmationHash, trustScore }
+        });
 
         res.json({
             message: 'Invoice verified via web confirmation',
@@ -163,6 +196,7 @@ router.post('/:id/verify-web', (req, res) => {
             trustScore
         });
     } catch (error) {
+        console.error('Verify web error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -171,10 +205,10 @@ router.post('/:id/verify-web', (req, res) => {
  * POST /invoice/:id/verify-wallet
  * Wallet signature verification
  */
-router.post('/:id/verify-wallet', (req, res) => {
+router.post('/:id/verify-wallet', async (req, res) => {
     try {
         const { signature, buyerAddress } = req.body;
-        const invoice = invoices.get(req.params.id);
+        const invoice = await Invoices.findById(req.params.id);
 
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
@@ -185,22 +219,34 @@ router.post('/:id/verify-wallet', (req, res) => {
         }
 
         // In production, verify signature using ethers.js
-        // For demo, we'll accept the signature as-is
         const signatureHash = crypto.createHash('sha256').update(signature).digest('hex');
 
         // Calculate trust score
-        const trustScore = trustScoreService.calculateScore(invoice.sellerId, invoice.amount);
+        const trustScore = trustScoreService.calculateScore(invoice.seller_id, invoice.amount);
         const trustHash = crypto.createHash('sha256')
             .update(`${invoice.id}|${trustScore}`)
             .digest('hex');
 
         // Update invoice
-        invoice.status = 'BUYER_VERIFIED';
-        invoice.verificationHash = signatureHash;
-        invoice.verificationType = 'WALLET_SIGNATURE';
-        invoice.buyerWallet = buyerAddress;
-        invoice.trustScore = trustScore;
-        invoice.trustHash = trustHash;
+        await Invoices.updateStatus(invoice.id, 'BUYER_VERIFIED');
+        await Invoices.setTrustScore(invoice.id, trustScore, trustHash);
+
+        // Create buyer confirmation record
+        await BuyerConfirmations.create({
+            invoiceId: invoice.id,
+            method: 'WALLET',
+            confirmationHash: signatureHash,
+            buyerSignature: signature
+        });
+
+        // Audit log
+        await AuditLogs.create({
+            entityType: 'INVOICE',
+            entityId: invoice.id,
+            action: 'INVOICE_VERIFIED_WALLET',
+            performedBy: buyerAddress,
+            metadata: { signatureHash, trustScore }
+        });
 
         res.json({
             message: 'Invoice verified via wallet signature',
@@ -217,111 +263,128 @@ router.post('/:id/verify-wallet', (req, res) => {
  * POST /invoice/:id/reject
  * Buyer rejects invoice
  */
-router.post('/:id/reject', (req, res) => {
-    const invoice = invoices.get(req.params.id);
+router.post('/:id/reject', async (req, res) => {
+    try {
+        const invoice = await Invoices.findById(req.params.id);
 
-    if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        if (invoice.status !== 'CREATED') {
+            return res.status(400).json({ error: 'Invoice cannot be rejected' });
+        }
+
+        await Invoices.updateStatus(invoice.id, 'REJECTED');
+
+        // Audit log
+        await AuditLogs.create({
+            entityType: 'INVOICE',
+            entityId: invoice.id,
+            action: 'INVOICE_REJECTED',
+            performedBy: 'buyer',
+            metadata: {}
+        });
+
+        res.json({
+            message: 'Invoice rejected',
+            invoiceId: invoice.id
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-
-    if (invoice.status !== 'CREATED') {
-        return res.status(400).json({ error: 'Invoice cannot be rejected' });
-    }
-
-    invoice.status = 'REJECTED';
-
-    res.json({
-        message: 'Invoice rejected',
-        invoiceId: invoice.id
-    });
 });
 
 /**
  * POST /invoice/:id/list
  * List invoice for funding (after verification)
  */
-router.post('/:id/list', authRoutes.authenticateToken, (req, res) => {
-    const invoice = invoices.get(req.params.id);
-    const user = authRoutes.users.get(req.user.username);
+router.post('/:id/list', authRoutes.authenticateToken, async (req, res) => {
+    try {
+        const invoice = await Invoices.findById(req.params.id);
+        const sellerProfile = await SellerProfiles.findByUserId(req.user.userId);
 
-    if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        if (invoice.seller_id !== sellerProfile?.id) {
+            return res.status(403).json({ error: 'Only seller can list invoice' });
+        }
+
+        if (invoice.status !== 'BUYER_VERIFIED') {
+            return res.status(400).json({ error: 'Invoice must be verified before listing' });
+        }
+
+        await Invoices.updateStatus(invoice.id, 'LISTED');
+
+        // Audit log
+        await AuditLogs.create({
+            entityType: 'INVOICE',
+            entityId: invoice.id,
+            action: 'INVOICE_LISTED',
+            performedBy: req.user.userId,
+            metadata: {}
+        });
+
+        const updatedInvoice = await Invoices.findById(invoice.id);
+
+        res.json({
+            message: 'Invoice listed for funding',
+            invoice: updatedInvoice
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-
-    if (invoice.sellerId !== user.id) {
-        return res.status(403).json({ error: 'Only seller can list invoice' });
-    }
-
-    if (invoice.status !== 'BUYER_VERIFIED') {
-        return res.status(400).json({ error: 'Invoice must be verified before listing' });
-    }
-
-    invoice.status = 'LISTED';
-
-    res.json({
-        message: 'Invoice listed for funding',
-        invoice
-    });
 });
 
 /**
  * GET /invoices/marketplace
  * Get all listed invoices for investors
  */
-router.get('/list/marketplace', (req, res) => {
-    const listedInvoices = [];
-
-    for (const [, invoice] of invoices) {
-        if (invoice.status === 'LISTED') {
-            listedInvoices.push({
-                id: invoice.id,
-                amount: invoice.amount,
-                dueDate: invoice.dueDate,
-                sellerName: invoice.sellerUsername,
-                trustScore: invoice.trustScore,
-                createdAt: invoice.createdAt
-            });
-        }
+router.get('/list/marketplace', async (req, res) => {
+    try {
+        const listedInvoices = await Invoices.findListed();
+        res.json(listedInvoices);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-
-    res.json(listedInvoices);
 });
 
 /**
  * GET /invoices/seller
  * Get seller's invoices
  */
-router.get('/list/seller', authRoutes.authenticateToken, (req, res) => {
-    const user = authRoutes.users.get(req.user.username);
-    const sellerInvoices = [];
-
-    for (const [, invoice] of invoices) {
-        if (invoice.sellerId === user.id) {
-            sellerInvoices.push(invoice);
+router.get('/list/seller', authRoutes.authenticateToken, async (req, res) => {
+    try {
+        const sellerProfile = await SellerProfiles.findByUserId(req.user.userId);
+        if (!sellerProfile) {
+            return res.json([]);
         }
-    }
 
-    res.json(sellerInvoices);
+        const sellerInvoices = await Invoices.findBySeller(sellerProfile.id);
+        res.json(sellerInvoices);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 /**
  * GET /invoices/investor
  * Get investor's funded invoices
  */
-router.get('/list/investor', authRoutes.authenticateToken, (req, res) => {
-    const user = authRoutes.users.get(req.user.username);
-    const investorInvoices = [];
-
-    for (const [, invoice] of invoices) {
-        if (invoice.investor === user.id) {
-            investorInvoices.push(invoice);
+router.get('/list/investor', authRoutes.authenticateToken, async (req, res) => {
+    try {
+        const investorProfile = await require('../models').InvestorProfiles.findByUserId(req.user.userId);
+        if (!investorProfile) {
+            return res.json([]);
         }
+
+        const investments = await Investments.findByInvestor(investorProfile.id);
+        res.json(investments);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-
-    res.json(investorInvoices);
 });
-
-// Export for use in other routes
-router.invoices = invoices;
 
 module.exports = router;

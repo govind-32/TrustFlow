@@ -200,6 +200,7 @@ CREATED → BUYER_VERIFIED → LISTED → FUNDED → SETTLED
 | `InvoiceNFT.sol` | ERC-721 tokens representing invoices |
 | `Escrow.sol` | Holds investor funds, handles settlement |
 | `TrustRegistry.sol` | Stores verification hashes on-chain |
+|a|b|
 
 ---
 

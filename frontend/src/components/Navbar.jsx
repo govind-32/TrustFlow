@@ -54,11 +54,12 @@ function Navbar({ user, wallet, onLogout, onWalletConnect }) {
                         </>
                     ) : (
                         <>
-                            {user.role === 'seller' && (
+                            {(user.role === 'seller' || user.role === 'SELLER') && (
                                 <>
                                     <Link to="/seller" className="navbar-link">Dashboard</Link>
                                     <Link to="/seller/create" className="navbar-link">Create Invoice</Link>
                                     <Link to="/seller/invoices" className="navbar-link">My Invoices</Link>
+                                    <Link to="/seller/profile" className="navbar-link">Profile</Link>
                                 </>
                             )}
                             {user.role === 'investor' && (
