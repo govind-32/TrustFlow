@@ -1,379 +1,579 @@
 /**
- * TrustFlow PostgreSQL Query Helpers
- * 
- * This module provides model-like functions for database operations.
- * Uses the PostgreSQL pool from config/database.js
+ * TrustFlow Database Models
+ * Uses Supabase when configured, falls back to in-memory storage for demo
  */
 
-const db = require('../config/database');
+const { supabaseAdmin, isConfigured } = require('../config/database');
 
-// =============================================================================
-// USERS
-// =============================================================================
+// In-memory storage for demo mode
+const demoData = {
+    users: new Map(),
+    sellerProfiles: new Map(),
+    buyerProfiles: new Map(),
+    investorProfiles: new Map(),
+    invoices: new Map(),
+    buyerConfirmations: new Map(),
+    trustScores: new Map(),
+    investments: new Map(),
+    auditLogs: []
+};
+
+let idCounter = 1;
+const generateId = () => `demo-${idCounter++}`;
+
+// Helper to check if using Supabase
+const useSupabase = () => isConfigured() && supabaseAdmin;
+
+// Users Model
 const Users = {
     async create({ role, username, email, phone, passwordHash, walletAddress }) {
-        const result = await db.query(
-            `INSERT INTO users (role, username, email, phone, password_hash, wallet_address)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-            [role, username, email, phone, passwordHash, walletAddress]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('users')
+                .insert({
+                    role,
+                    username,
+                    email,
+                    phone,
+                    password_hash: passwordHash,
+                    wallet_address: walletAddress?.toLowerCase()
+                })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        // Demo mode
+        const user = {
+            id: generateId(),
+            role,
+            username,
+            email,
+            phone,
+            password_hash: passwordHash,
+            wallet_address: walletAddress?.toLowerCase(),
+            is_wallet_linked: false,
+            created_at: new Date().toISOString()
+        };
+        demoData.users.set(user.id, user);
+        demoData.users.set(username, user); // Index by username
+        return user;
     },
 
     async findByUsername(username) {
-        const result = await db.query(
-            'SELECT * FROM users WHERE username = $1',
-            [username]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('users')
+                .select('*')
+                .eq('username', username)
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.users.get(username);
     },
 
     async findById(id) {
-        const result = await db.query(
-            'SELECT * FROM users WHERE id = $1',
-            [id]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('users')
+                .select('*')
+                .eq('id', id)
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.users.get(id);
     },
 
     async findByWallet(walletAddress) {
-        const result = await db.query(
-            'SELECT * FROM users WHERE wallet_address = $1',
-            [walletAddress.toLowerCase()]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('users')
+                .select('*')
+                .eq('wallet_address', walletAddress.toLowerCase())
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        for (const user of demoData.users.values()) {
+            if (user.wallet_address === walletAddress.toLowerCase()) return user;
+        }
+        return null;
     },
 
     async linkWallet(userId, walletAddress) {
-        const result = await db.query(
-            `UPDATE users SET wallet_address = $1, is_wallet_linked = true, updated_at = now()
-       WHERE id = $2 RETURNING *`,
-            [walletAddress.toLowerCase(), userId]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('users')
+                .update({
+                    wallet_address: walletAddress.toLowerCase(),
+                    is_wallet_linked: true,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', userId)
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+        const user = demoData.users.get(userId);
+        if (user) {
+            user.wallet_address = walletAddress.toLowerCase();
+            user.is_wallet_linked = true;
+        }
+        return user;
     }
 };
 
-// =============================================================================
-// SELLER PROFILES
-// =============================================================================
+// Seller Profiles Model
 const SellerProfiles = {
     async create({ userId, businessName, gstNumber, industry }) {
-        const result = await db.query(
-            `INSERT INTO seller_profiles (user_id, business_name, gst_number, industry)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-            [userId, businessName, gstNumber, industry]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('seller_profiles')
+                .insert({
+                    user_id: userId,
+                    business_name: businessName,
+                    gst_number: gstNumber,
+                    industry
+                })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        const profile = {
+            id: generateId(),
+            user_id: userId,
+            business_name: businessName,
+            gst_number: gstNumber,
+            industry,
+            trust_score: 50,
+            total_invoices: 0,
+            successful_invoices: 0,
+            defaulted_invoices: 0,
+            total_raised: 0,
+            created_at: new Date().toISOString()
+        };
+        demoData.sellerProfiles.set(profile.id, profile);
+        demoData.sellerProfiles.set(userId, profile); // Index by userId
+        return profile;
     },
 
     async findByUserId(userId) {
-        const result = await db.query(
-            'SELECT * FROM seller_profiles WHERE user_id = $1',
-            [userId]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('seller_profiles')
+                .select('*')
+                .eq('user_id', userId)
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.sellerProfiles.get(userId);
+    },
+
+    async update(userId, updates) {
+        if (useSupabase()) {
+            const updateData = {};
+            if (updates.businessName) updateData.business_name = updates.businessName;
+            if (updates.gstNumber) updateData.gst_number = updates.gstNumber;
+            if (updates.industry) updateData.industry = updates.industry;
+            updateData.updated_at = new Date().toISOString();
+
+            const { data, error } = await supabaseAdmin
+                .from('seller_profiles')
+                .update(updateData)
+                .eq('user_id', userId)
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        const profile = demoData.sellerProfiles.get(userId);
+        if (profile) {
+            Object.assign(profile, updates);
+        }
+        return profile;
     },
 
     async updateTrustScore(id, score) {
-        const result = await db.query(
-            `UPDATE seller_profiles SET trust_score = $1, updated_at = now()
-       WHERE id = $2 RETURNING *`,
-            [score, id]
-        );
-        return result.rows[0];
-    },
-
-    async incrementInvoiceCount(id, field) {
-        const result = await db.query(
-            `UPDATE seller_profiles SET ${field} = ${field} + 1, updated_at = now()
-       WHERE id = $1 RETURNING *`,
-            [id]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('seller_profiles')
+                .update({ trust_score: score, updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+        const profile = demoData.sellerProfiles.get(id);
+        if (profile) profile.trust_score = score;
+        return profile;
     }
 };
 
-// =============================================================================
-// BUYER PROFILES
-// =============================================================================
+// Buyer Profiles Model
 const BuyerProfiles = {
     async findOrCreate(email, companyName = null) {
-        let result = await db.query(
-            'SELECT * FROM buyer_profiles WHERE email = $1',
-            [email.toLowerCase()]
-        );
+        const normalizedEmail = email.toLowerCase();
 
-        if (result.rows.length === 0) {
-            result = await db.query(
-                `INSERT INTO buyer_profiles (email, company_name)
-         VALUES ($1, $2)
-         RETURNING *`,
-                [email.toLowerCase(), companyName]
-            );
+        if (useSupabase()) {
+            let { data } = await supabaseAdmin
+                .from('buyer_profiles')
+                .select('*')
+                .eq('email', normalizedEmail)
+                .single();
+
+            if (!data) {
+                const { data: newData, error } = await supabaseAdmin
+                    .from('buyer_profiles')
+                    .insert({ email: normalizedEmail, company_name: companyName })
+                    .select()
+                    .single();
+                if (error) throw error;
+                data = newData;
+            }
+            return data;
         }
-        return result.rows[0];
+
+        let profile = demoData.buyerProfiles.get(normalizedEmail);
+        if (!profile) {
+            profile = {
+                id: generateId(),
+                email: normalizedEmail,
+                company_name: companyName,
+                reputation_score: 50,
+                created_at: new Date().toISOString()
+            };
+            demoData.buyerProfiles.set(normalizedEmail, profile);
+        }
+        return profile;
     },
 
     async findByEmail(email) {
-        const result = await db.query(
-            'SELECT * FROM buyer_profiles WHERE email = $1',
-            [email.toLowerCase()]
-        );
-        return result.rows[0];
-    },
-
-    async updateReputation(email, score) {
-        const result = await db.query(
-            `UPDATE buyer_profiles SET reputation_score = $1, updated_at = now()
-       WHERE email = $2 RETURNING *`,
-            [score, email.toLowerCase()]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('buyer_profiles')
+                .select('*')
+                .eq('email', email.toLowerCase())
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.buyerProfiles.get(email.toLowerCase());
     }
 };
 
-// =============================================================================
-// INVESTOR PROFILES
-// =============================================================================
+// Investor Profiles Model
 const InvestorProfiles = {
     async create({ userId, riskPreference = 'MEDIUM' }) {
-        const result = await db.query(
-            `INSERT INTO investor_profiles (user_id, risk_preference)
-       VALUES ($1, $2)
-       RETURNING *`,
-            [userId, riskPreference]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('investor_profiles')
+                .insert({ user_id: userId, risk_preference: riskPreference })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        const profile = {
+            id: generateId(),
+            user_id: userId,
+            risk_preference: riskPreference,
+            total_invested: 0,
+            created_at: new Date().toISOString()
+        };
+        demoData.investorProfiles.set(userId, profile);
+        return profile;
     },
 
     async findByUserId(userId) {
-        const result = await db.query(
-            'SELECT * FROM investor_profiles WHERE user_id = $1',
-            [userId]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('investor_profiles')
+                .select('*')
+                .eq('user_id', userId)
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.investorProfiles.get(userId);
     }
 };
 
-// =============================================================================
-// INVOICES
-// =============================================================================
+// Invoices Model
 const Invoices = {
     async create({ invoiceNumber, sellerId, buyerEmail, buyerWallet, amount, currency, dueDate, description, ipfsHash }) {
-        const result = await db.query(
-            `INSERT INTO invoices (invoice_number, seller_id, buyer_email, buyer_wallet, amount, currency, due_date, description, ipfs_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-            [invoiceNumber, sellerId, buyerEmail, buyerWallet, amount, currency || 'ETH', dueDate, description, ipfsHash]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .insert({
+                    invoice_number: invoiceNumber,
+                    seller_id: sellerId,
+                    buyer_email: buyerEmail,
+                    buyer_wallet: buyerWallet,
+                    amount,
+                    currency: currency || 'ETH',
+                    due_date: dueDate,
+                    description,
+                    ipfs_hash: ipfsHash,
+                    status: 'CREATED'
+                })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        const invoice = {
+            id: invoiceNumber,
+            invoice_number: invoiceNumber,
+            seller_id: sellerId,
+            buyer_email: buyerEmail,
+            buyer_wallet: buyerWallet,
+            amount: parseFloat(amount),
+            currency: currency || 'ETH',
+            due_date: dueDate,
+            description,
+            ipfs_hash: ipfsHash,
+            status: 'CREATED',
+            trust_score: null,
+            created_at: new Date().toISOString()
+        };
+        demoData.invoices.set(invoiceNumber, invoice);
+        return invoice;
     },
 
     async findById(id) {
-        const result = await db.query(
-            'SELECT * FROM invoices WHERE id = $1',
-            [id]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .select('*')
+                .eq('id', id)
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.invoices.get(id);
     },
 
     async findByNumber(invoiceNumber) {
-        const result = await db.query(
-            'SELECT * FROM invoices WHERE invoice_number = $1',
-            [invoiceNumber]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .select('*')
+                .eq('invoice_number', invoiceNumber)
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.invoices.get(invoiceNumber);
     },
 
     async findBySeller(sellerId) {
-        const result = await db.query(
-            'SELECT * FROM invoices WHERE seller_id = $1 ORDER BY created_at DESC',
-            [sellerId]
-        );
-        return result.rows;
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .select('*')
+                .eq('seller_id', sellerId)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        }
+        return Array.from(demoData.invoices.values())
+            .filter(inv => inv.seller_id === sellerId);
     },
 
     async findByStatus(status) {
-        const result = await db.query(
-            'SELECT * FROM invoices WHERE status = $1 ORDER BY created_at DESC',
-            [status]
-        );
-        return result.rows;
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .select('*')
+                .eq('status', status)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        }
+        return Array.from(demoData.invoices.values())
+            .filter(inv => inv.status === status);
     },
 
     async findListed() {
-        const result = await db.query(
-            `SELECT i.*, sp.business_name as seller_name, sp.trust_score as seller_trust
-       FROM invoices i
-       JOIN seller_profiles sp ON i.seller_id = sp.id
-       WHERE i.status = 'LISTED'
-       ORDER BY i.trust_score DESC`
-        );
-        return result.rows;
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .select('*, seller_profiles(business_name, trust_score)')
+                .eq('status', 'LISTED')
+                .order('trust_score', { ascending: false });
+            if (error) throw error;
+            return (data || []).map(inv => ({
+                ...inv,
+                sellerName: inv.seller_profiles?.business_name,
+                sellerTrust: inv.seller_profiles?.trust_score
+            }));
+        }
+        return Array.from(demoData.invoices.values())
+            .filter(inv => inv.status === 'LISTED');
     },
 
     async updateStatus(id, status) {
-        const result = await db.query(
-            `UPDATE invoices SET status = $1, updated_at = now()
-       WHERE id = $2 RETURNING *`,
-            [status, id]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .update({ status, updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+        const invoice = demoData.invoices.get(id);
+        if (invoice) invoice.status = status;
+        return invoice;
     },
 
     async setTrustScore(id, score, trustHash) {
-        const result = await db.query(
-            `UPDATE invoices SET trust_score = $1, trust_hash = $2, updated_at = now()
-       WHERE id = $3 RETURNING *`,
-            [score, trustHash, id]
-        );
-        return result.rows[0];
-    },
-
-    async setNftDetails(id, tokenId, escrowContract) {
-        const result = await db.query(
-            `UPDATE invoices SET nft_token_id = $1, escrow_contract = $2, updated_at = now()
-       WHERE id = $3 RETURNING *`,
-            [tokenId, escrowContract, id]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('invoices')
+                .update({ trust_score: score, trust_hash: trustHash, updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+        const invoice = demoData.invoices.get(id);
+        if (invoice) {
+            invoice.trust_score = score;
+            invoice.trust_hash = trustHash;
+        }
+        return invoice;
     }
 };
 
-// =============================================================================
-// BUYER CONFIRMATIONS
-// =============================================================================
+// Buyer Confirmations Model
 const BuyerConfirmations = {
     async create({ invoiceId, method, confirmationHash, buyerSignature }) {
-        const result = await db.query(
-            `INSERT INTO buyer_confirmations (invoice_id, method, confirmation_hash, buyer_signature)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-            [invoiceId, method, confirmationHash, buyerSignature]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('buyer_confirmations')
+                .insert({
+                    invoice_id: invoiceId,
+                    method,
+                    confirmation_hash: confirmationHash,
+                    buyer_signature: buyerSignature
+                })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        const confirmation = {
+            id: generateId(),
+            invoice_id: invoiceId,
+            method,
+            confirmation_hash: confirmationHash,
+            buyer_signature: buyerSignature,
+            confirmed_at: new Date().toISOString()
+        };
+        demoData.buyerConfirmations.set(invoiceId, confirmation);
+        return confirmation;
     },
 
     async findByInvoice(invoiceId) {
-        const result = await db.query(
-            'SELECT * FROM buyer_confirmations WHERE invoice_id = $1',
-            [invoiceId]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('buyer_confirmations')
+                .select('*')
+                .eq('invoice_id', invoiceId)
+                .single();
+            if (error && error.code !== 'PGRST116') throw error;
+            return data;
+        }
+        return demoData.buyerConfirmations.get(invoiceId);
     }
 };
 
-// =============================================================================
-// TRUST SCORES
-// =============================================================================
+// Trust Scores Model
 const TrustScores = {
     async create({ invoiceId, sellerId, buyerEmail, score, breakdown }) {
-        const result = await db.query(
-            `INSERT INTO trust_scores (invoice_id, seller_id, buyer_email, score, seller_history, buyer_reputation, invoice_size, penalties)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-            [invoiceId, sellerId, buyerEmail, score, breakdown.sellerHistory, breakdown.buyerReputation, breakdown.invoiceSize, breakdown.penalties]
-        );
-        return result.rows[0];
-    },
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('trust_scores')
+                .insert({ invoice_id: invoiceId, seller_id: sellerId, buyer_email: buyerEmail, score, breakdown })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
 
-    async findByInvoice(invoiceId) {
-        const result = await db.query(
-            'SELECT * FROM trust_scores WHERE invoice_id = $1',
-            [invoiceId]
-        );
-        return result.rows[0];
+        const trustScore = { id: generateId(), invoice_id: invoiceId, seller_id: sellerId, buyer_email: buyerEmail, score, breakdown };
+        demoData.trustScores.set(invoiceId, trustScore);
+        return trustScore;
     }
 };
 
-// =============================================================================
-// INVESTMENTS
-// =============================================================================
+// Investments Model
 const Investments = {
-    async create({ invoiceId, investorId, investedAmount, expectedReturn, escrowTxHash }) {
-        const result = await db.query(
-            `INSERT INTO investments (invoice_id, investor_id, invested_amount, expected_return, escrow_tx_hash)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-            [invoiceId, investorId, investedAmount, expectedReturn, escrowTxHash]
-        );
-        return result.rows[0];
+    async create({ investorId, invoiceId, amount, status }) {
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('investments')
+                .insert({ investor_id: investorId, invoice_id: invoiceId, amount, status })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        const investment = { id: generateId(), investor_id: investorId, invoice_id: invoiceId, amount, status };
+        demoData.investments.set(investment.id, investment);
+        return investment;
     },
 
     async findByInvestor(investorId) {
-        const result = await db.query(
-            `SELECT inv.*, i.invoice_number, i.amount, i.due_date, i.status as invoice_status
-       FROM investments inv
-       JOIN invoices i ON inv.invoice_id = i.id
-       WHERE inv.investor_id = $1
-       ORDER BY inv.invested_at DESC`,
-            [investorId]
-        );
-        return result.rows;
-    },
-
-    async updateStatus(id, status, settledAt = null) {
-        const result = await db.query(
-            `UPDATE investments SET status = $1, settled_at = $2
-       WHERE id = $3 RETURNING *`,
-            [status, settledAt, id]
-        );
-        return result.rows[0];
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('investments')
+                .select('*, invoices(*)')
+                .eq('investor_id', investorId)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        }
+        return Array.from(demoData.investments.values())
+            .filter(inv => inv.investor_id === investorId);
     }
 };
 
-// =============================================================================
-// PAYMENTS
-// =============================================================================
-const Payments = {
-    async create({ invoiceId, payer, amount, txHash, isLate, penaltyApplied }) {
-        const result = await db.query(
-            `INSERT INTO payments (invoice_id, payer, amount, tx_hash, is_late, penalty_applied)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-            [invoiceId, payer || 'BUYER', amount, txHash, isLate || false, penaltyApplied || 0]
-        );
-        return result.rows[0];
-    },
-
-    async findByInvoice(invoiceId) {
-        const result = await db.query(
-            'SELECT * FROM payments WHERE invoice_id = $1',
-            [invoiceId]
-        );
-        return result.rows;
-    }
-};
-
-// =============================================================================
-// AUDIT LOGS
-// =============================================================================
+// Audit Logs Model
 const AuditLogs = {
-    async create({ entityType, entityId, action, performedBy, metadata }) {
-        const result = await db.query(
-            `INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, metadata)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-            [entityType, entityId, action, performedBy, JSON.stringify(metadata)]
-        );
-        return result.rows[0];
-    },
+    async create({ userId, action, entityType, entityId, details, ipAddress }) {
+        if (useSupabase()) {
+            const { data, error } = await supabaseAdmin
+                .from('audit_logs')
+                .insert({ user_id: userId, action, entity_type: entityType, entity_id: entityId, details, ip_address: ipAddress })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
 
-    async findByEntity(entityType, entityId) {
-        const result = await db.query(
-            'SELECT * FROM audit_logs WHERE entity_type = $1 AND entity_id = $2 ORDER BY timestamp DESC',
-            [entityType, entityId]
-        );
-        return result.rows;
+        const log = { id: generateId(), user_id: userId, action, entity_type: entityType, entity_id: entityId, details, ip_address: ipAddress, created_at: new Date().toISOString() };
+        demoData.auditLogs.push(log);
+        return log;
     }
 };
 
-// =============================================================================
-// EXPORT ALL MODELS
-// =============================================================================
 module.exports = {
     Users,
     SellerProfiles,
@@ -383,6 +583,5 @@ module.exports = {
     BuyerConfirmations,
     TrustScores,
     Investments,
-    Payments,
     AuditLogs
 };

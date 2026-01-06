@@ -47,7 +47,7 @@ function App() {
             <Navbar user={user} wallet={wallet} onLogout={handleLogout} onWalletConnect={handleWalletConnect} />
             <Routes>
                 <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login onLogin={handleLogin} />} />
+                <Route path="/login" element={<Login onLogin={handleLogin} user={user} />} />
                 <Route path="/register" element={<Register onLogin={handleLogin} />} />
 
                 {/* Seller Routes */}

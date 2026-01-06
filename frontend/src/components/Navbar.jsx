@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import logo from '../assets/logo.png' 
+import logo from '../assets/logo.png'
 
 function Navbar({ user, wallet, onLogout, onWalletConnect }) {
     const navigate = useNavigate()
@@ -68,7 +68,7 @@ function Navbar({ user, wallet, onLogout, onWalletConnect }) {
                                     <Link to="/seller/profile" className="navbar-link">Profile</Link>
                                 </>
                             )}
-                            {user.role === 'investor' && (
+                            {(user.role === 'investor' || user.role === 'INVESTOR') && (
                                 <>
                                     <Link to="/investor" className="navbar-link">Marketplace</Link>
                                     <Link to="/investor/portfolio" className="navbar-link">Portfolio</Link>

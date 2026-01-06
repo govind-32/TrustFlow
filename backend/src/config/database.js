@@ -1,60 +1,65 @@
-const { Pool } = require('pg');
+const { createClient } = require('@supabase/supabase-js');
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/trustflow',
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// Load environment variables
+require('dotenv').config();
+
+// Initialize Supabase client
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+let supabase = null;
+let supabaseAdmin = null;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.warn('⚠️  Supabase credentials not configured.');
+    console.warn('   Create a .env file in /backend with:');
+    console.warn('   SUPABASE_URL=https://your-project.supabase.co');
+    console.warn('   SUPABASE_ANON_KEY=your-anon-key');
+    console.warn('   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key');
+    console.warn('');
+    console.warn('   Running in DEMO MODE with in-memory storage...');
+} else {
+    // Public client (respects RLS policies)
+    supabase = createClient(supabaseUrl, supabaseKey, {
+        auth: { persistSession: false }
+    });
+
+    // Admin client (bypasses RLS - use for server-side operations)
+    supabaseAdmin = supabaseServiceKey
+        ? createClient(supabaseUrl, supabaseServiceKey, {
+            auth: { persistSession: false }
+        })
+        : supabase;
+}
 
 // Test connection
-pool.on('connect', () => {
-    console.log('PostgreSQL Connected');
-});
+const testConnection = async () => {
+    if (!supabase) {
+        console.log('📦 Running in DEMO MODE (no database)');
+        return false;
+    }
 
-pool.on('error', (err) => {
-    console.error('PostgreSQL error:', err);
-});
-
-// Query helper with error handling
-const query = async (text, params) => {
-    const start = Date.now();
     try {
-        const result = await pool.query(text, params);
-        const duration = Date.now() - start;
-        if (process.env.NODE_ENV === 'development') {
-            console.log('Query executed:', { text: text.substring(0, 50), duration, rows: result.rowCount });
+        const { error } = await supabase.from('users').select('count').limit(1);
+        if (error && error.code !== 'PGRST116') {
+            console.error('Supabase connection failed:', error.message);
+            return false;
         }
-        return result;
-    } catch (error) {
-        console.error('Query error:', error.message);
-        throw error;
+        console.log('✅ Supabase Connected');
+        return true;
+    } catch (err) {
+        console.error('Supabase error:', err.message);
+        return false;
     }
 };
 
-// Transaction helper
-const transaction = async (callback) => {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        const result = await callback(client);
-        await client.query('COMMIT');
-        return result;
-    } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    } finally {
-        client.release();
-    }
-};
-
-// Graceful shutdown
-const close = async () => {
-    await pool.end();
-    console.log('PostgreSQL connection closed');
-};
+// Check if Supabase is configured
+const isConfigured = () => supabase !== null;
 
 module.exports = {
-    pool,
-    query,
-    transaction,
-    close
+    supabase,
+    supabaseAdmin,
+    testConnection,
+    isConfigured
 };

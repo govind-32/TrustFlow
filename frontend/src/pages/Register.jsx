@@ -49,7 +49,10 @@ function Register({ onLogin }) {
             }
 
             onLogin(data.user, data.token)
-            navigate(data.user.role === 'seller' ? '/seller' : '/investor')
+
+            const role = data.user.role?.toLowerCase()
+            const destination = role === 'seller' ? '/seller' : '/investor'
+            window.location.href = destination
         } catch (err) {
             setError(err.message)
         } finally {

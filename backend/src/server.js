@@ -22,16 +22,11 @@ app.use('/api/invoice', invoiceRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {
-    try {
-        const result = await db.query('SELECT NOW()');
-        res.json({
-            status: 'ok',
-            database: 'connected',
-            timestamp: result.rows[0].now
-        });
-    } catch (error) {
-        res.json({ status: 'ok', database: 'disconnected', timestamp: new Date().toISOString() });
-    }
+    res.json({
+        status: 'ok',
+        database: db.isConfigured() ? 'connected' : 'demo-mode',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Error handler
@@ -42,30 +37,24 @@ app.use((err, req, res, next) => {
 
 // Start server
 const startServer = async () => {
-    try {
-        // Test database connection
-        await db.query('SELECT 1');
-        console.log('PostgreSQL Connected');
+    // Test database connection
+    const connected = await db.testConnection();
 
-        app.listen(PORT, () => {
-            console.log(`TrustFlow Backend running on port ${PORT}`);
-        });
-    } catch (error) {
-        console.warn('PostgreSQL not connected - running without database');
-        app.listen(PORT, () => {
-            console.log(`TrustFlow Backend running on port ${PORT} (no database)`);
-        });
-    }
+    app.listen(PORT, () => {
+        if (connected) {
+            console.log(`TrustFlow Backend running on port ${PORT} with Supabase`);
+        } else {
+            console.log(`TrustFlow Backend running on port ${PORT} (demo mode)`);
+        }
+    });
 };
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
-    await db.close();
+process.on('SIGINT', () => {
+    console.log('Shutting down...');
     process.exit(0);
 });
 
 startServer();
 
 module.exports = app;
-
-

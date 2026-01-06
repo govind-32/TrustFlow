@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
-function Login({ onLogin }) {
+function Login({ onLogin, user }) {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
 
@@ -12,6 +12,14 @@ function Login({ onLogin }) {
     })
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+
+    // Redirect if already logged in
+    useEffect(() => {
+        if (user) {
+            const role = user.role?.toLowerCase()
+            navigate(role === 'seller' ? '/seller' : '/investor', { replace: true })
+        }
+    }, [user, navigate])
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -38,8 +46,14 @@ function Login({ onLogin }) {
                 throw new Error(data.error || 'Login failed')
             }
 
+            // Call onLogin first, then navigate
             onLogin(data.user, data.token)
-            navigate(data.user.role === 'seller' ? '/seller' : '/investor')
+
+            const role = data.user.role?.toLowerCase()
+            const destination = role === 'seller' ? '/seller' : '/investor'
+
+            // Use window.location for guaranteed navigation
+            window.location.href = destination
         } catch (err) {
             setError(err.message)
         } finally {
@@ -64,11 +78,18 @@ function Login({ onLogin }) {
                     walletAddress: accounts[0]
                 }
                 onLogin(tempUser, 'wallet-auth')
-                navigate(formData.role === 'seller' ? '/seller' : '/investor')
+
+                const destination = formData.role === 'seller' ? '/seller' : '/investor'
+                window.location.href = destination
             }
         } catch (err) {
             setError('Failed to connect wallet')
         }
+    }
+
+    // Don't render if already logged in
+    if (user) {
+        return <div className="page"><div className="container">Redirecting...</div></div>
     }
 
     return (
