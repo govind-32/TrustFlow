@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import './Register.css'
+import logo from '../assets/logo.png'
 
 function Register({ onLogin }) {
     const [searchParams] = useSearchParams()
@@ -16,7 +18,8 @@ function Register({ onLogin }) {
     const [loading, setLoading] = useState(false)
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value })
+        const value = e.target.type === 'radio' ? e.target.value : e.target.value
+        setFormData({ ...formData, [e.target.name]: value })
     }
 
     const handleSubmit = async (e) => {
@@ -58,100 +61,120 @@ function Register({ onLogin }) {
     }
 
     return (
-        <div className="page">
-            <div className="container" style={{ maxWidth: '400px' }}>
-                <div className="card" style={{ padding: '32px' }}>
-                    <h1 style={{ textAlign: 'center', marginBottom: '8px' }}>Create Account</h1>
-                    <p style={{ textAlign: 'center', marginBottom: '24px' }}>Join TrustFlow today</p>
+        <div className="register-page">
+            <div className="register-container">
+                <div className="register-card">
+                    {/* Logo/Icon */}
+                    <div className="login-icon">
+                                            <img src={logo} alt="TrustFlow Logo" style={{ height: '48px', width: 'auto' }} />
+                                        </div>
 
-                    {error && <div className="alert alert-error">{error}</div>}
+                    {/* Heading */}
+                    <h1 className="register-title">Create your account</h1>
+                    <p className="register-subtitle">Join TrustFlow today</p>
 
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label className="form-label">Register As</label>
-                            <div className="radio-group">
-                                <label className="radio-label">
-                                    <input
-                                        type="radio"
-                                        name="role"
-                                        value="seller"
-                                        checked={formData.role === 'seller'}
-                                        onChange={handleChange}
-                                    />
+                    {/* Error Message */}
+                    {error && <div className="register-error">{error}</div>}
+
+                    {/* Register Form */}
+                    <form onSubmit={handleSubmit} className="register-form">
+                        {/* Role Selection */}
+                        <div className="role-selection">
+                            <label className="field-label">Register As</label>
+                            <div className="role-buttons">
+                                <button
+                                    type="button"
+                                    className={`role-button ${formData.role === 'seller' ? 'active' : ''}`}
+                                    onClick={() => setFormData({ ...formData, role: 'seller' })}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                    </svg>
                                     Seller
-                                </label>
-                                <label className="radio-label">
-                                    <input
-                                        type="radio"
-                                        name="role"
-                                        value="investor"
-                                        checked={formData.role === 'investor'}
-                                        onChange={handleChange}
-                                    />
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`role-button ${formData.role === 'investor' ? 'active' : ''}`}
+                                    onClick={() => setFormData({ ...formData, role: 'investor' })}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                    </svg>
                                     Investor
-                                </label>
+                                </button>
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Username</label>
+                        <div className="form-field">
+                            <label className="field-label">Username</label>
                             <input
                                 type="text"
                                 name="username"
-                                className="form-input"
+                                className="field-input"
                                 placeholder="Choose a username"
                                 value={formData.username}
                                 onChange={handleChange}
                                 required
+                                autoComplete="username"
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Email (Optional)</label>
+                        <div className="form-field">
+                            <label className="field-label">Email (Optional)</label>
                             <input
                                 type="email"
                                 name="email"
-                                className="form-input"
+                                className="field-input"
                                 placeholder="your@email.com"
                                 value={formData.email}
                                 onChange={handleChange}
+                                autoComplete="email"
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Password</label>
+                        <div className="form-field">
+                            <label className="field-label">Password</label>
                             <input
                                 type="password"
                                 name="password"
-                                className="form-input"
+                                className="field-input"
                                 placeholder="Create password"
                                 value={formData.password}
                                 onChange={handleChange}
                                 required
+                                autoComplete="new-password"
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Confirm Password</label>
+                        <div className="form-field">
+                            <label className="field-label">Confirm Password</label>
                             <input
                                 type="password"
                                 name="confirmPassword"
-                                className="form-input"
+                                className="field-input"
                                 placeholder="Confirm password"
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
                                 required
+                                autoComplete="new-password"
                             />
                         </div>
 
-                        <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+                        <button type="submit" className="create-button" disabled={loading}>
                             {loading ? 'Creating Account...' : 'Create Account'}
                         </button>
                     </form>
 
-                    <p style={{ textAlign: 'center', marginTop: '24px' }}>
-                        Already have an account? <Link to={`/login?role=${formData.role}`}>Login</Link>
-                    </p>
+                    {/* Login Link */}
+                    <div className="register-footer">
+                        <span>Already have an account? </span>
+                        <Link to={`/login?role=${formData.role}`} className="login-link">
+                            Login
+                        </Link>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,20 +1,24 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import './Login.css'
+import logo from '../assets/logo.png'
 
 function Login({ onLogin }) {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
 
     const [formData, setFormData] = useState({
-        username: '',
+        email: '',
         password: '',
+        rememberMe: false,
         role: searchParams.get('role') || 'seller'
     })
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value })
+        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
+        setFormData({ ...formData, [e.target.name]: value })
     }
 
     const handleSubmit = async (e) => {
@@ -27,7 +31,7 @@ function Login({ onLogin }) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    username: formData.username,
+                    username: formData.email,
                     password: formData.password
                 })
             })
@@ -47,6 +51,13 @@ function Login({ onLogin }) {
         }
     }
 
+    const handleSocialLogin = async (provider) => {
+        setError('')
+        // Implement social login logic here
+        console.log(`Login with ${provider}`)
+        setError(`${provider} login coming soon!`)
+    }
+
     const handleWalletLogin = async () => {
         if (typeof window.ethereum === 'undefined') {
             setError('Please install MetaMask to continue with wallet')
@@ -56,7 +67,6 @@ function Login({ onLogin }) {
         try {
             const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
             if (accounts.length > 0) {
-                // For demo, create a temporary user from wallet
                 const tempUser = {
                     id: accounts[0],
                     username: accounts[0].slice(0, 8),
@@ -72,81 +82,110 @@ function Login({ onLogin }) {
     }
 
     return (
-        <div className="page">
-            <div className="container" style={{ maxWidth: '400px' }}>
-                <div className="card" style={{ padding: '32px' }}>
-                    <h1 style={{ textAlign: 'center', marginBottom: '8px' }}>Login</h1>
-                    <p style={{ textAlign: 'center', marginBottom: '24px' }}>Welcome back to TrustFlow</p>
+        <div className="login-page">
+            <div className="login-container">
+                <div className="login-card">
+                    {/* Logo/Icon */}
+                    <div className="login-icon">
+                        <img src={logo} alt="TrustFlow Logo" style={{ height: '48px', width: 'auto' }} />
+                    </div>
 
-                    {error && <div className="alert alert-error">{error}</div>}
+                    {/* Heading */}
+                    <h1 className="login-title">Sign in to your account</h1>
 
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label className="form-label">Login As</label>
-                            <div className="radio-group">
-                                <label className="radio-label">
-                                    <input
-                                        type="radio"
-                                        name="role"
-                                        value="seller"
-                                        checked={formData.role === 'seller'}
-                                        onChange={handleChange}
-                                    />
+                    {/* Error Message */}
+                    {error && <div className="login-error">{error}</div>}
+
+                    {/* Login Form */}
+                    <form onSubmit={handleSubmit} className="login-form">
+                        {/* Role Selection */}
+                        <div className="role-selection">
+                            <label className="field-label">Login As</label>
+                            <div className="role-buttons">
+                                <button
+                                    type="button"
+                                    className={`role-button ${formData.role === 'seller' ? 'active' : ''}`}
+                                    onClick={() => setFormData({ ...formData, role: 'seller' })}
+                                >
                                     Seller
-                                </label>
-                                <label className="radio-label">
-                                    <input
-                                        type="radio"
-                                        name="role"
-                                        value="investor"
-                                        checked={formData.role === 'investor'}
-                                        onChange={handleChange}
-                                    />
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`role-button ${formData.role === 'investor' ? 'active' : ''}`}
+                                    onClick={() => setFormData({ ...formData, role: 'investor' })}
+                                >
                                     Investor
-                                </label>
+                                </button>
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Username</label>
+                        <div className="form-field">
+                            <label className="field-label">Email address</label>
                             <input
-                                type="text"
-                                name="username"
-                                className="form-input"
-                                placeholder="Enter username"
-                                value={formData.username}
+                                type="email"
+                                name="email"
+                                className="field-input"
+                                placeholder=""
+                                value={formData.email}
                                 onChange={handleChange}
                                 required
+                                autoComplete="email"
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Password</label>
+                        <div className="form-field">
+                            <label className="field-label">Password</label>
                             <input
                                 type="password"
                                 name="password"
-                                className="form-input"
-                                placeholder="Enter password"
+                                className="field-input"
+                                placeholder=""
                                 value={formData.password}
                                 onChange={handleChange}
                                 required
+                                autoComplete="current-password"
                             />
                         </div>
 
-                        <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
-                            {loading ? 'Logging in...' : 'Login'}
+                        <div className="form-options">
+                            <label className="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    name="rememberMe"
+                                    checked={formData.rememberMe}
+                                    onChange={handleChange}
+                                    className="checkbox-input"
+                                />
+                                <span>Remember me</span>
+                            </label>
+                            <Link to="/forgot-password" className="forgot-link">
+                                Forgot password?
+                            </Link>
+                        </div>
+
+                        <button type="submit" className="signin-button" disabled={loading}>
+                            {loading ? 'Signing in...' : 'Sign in'}
                         </button>
                     </form>
 
-                    <div className="divider">OR</div>
+                    {/* Divider */}
+                    <div className="login-divider">
+                        <span>Or continue with</span>
+                    </div>
 
-                    <button onClick={handleWalletLogin} className="btn btn-outline btn-full">
-                        Continue with Wallet
+                    {/* Wallet Button */}
+                    <button 
+                        type="button" 
+                        className="social-button wallet-button-full"
+                        onClick={handleWalletLogin}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M2 5C2 3.34315 3.34315 2 5 2H15C16.6569 2 18 3.34315 18 5V15C18 16.6569 16.6569 18 15 18H5C3.34315 18 2 16.6569 2 15V5Z" />
+                            <path d="M14 10C14 11.1046 13.1046 12 12 12C10.8954 12 10 11.1046 10 10C10 8.89543 10.8954 8 12 8C13.1046 8 14 8.89543 14 10Z" fill="#1e293b"/>
+                            <rect x="4" y="4" width="12" height="3" rx="1" />
+                        </svg>
+                        Connect to Wallet
                     </button>
-
-                    <p style={{ textAlign: 'center', marginTop: '24px' }}>
-                        New user? <Link to={`/register?role=${formData.role}`}>Create Account</Link>
-                    </p>
                 </div>
             </div>
         </div>

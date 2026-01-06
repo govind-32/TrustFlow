@@ -1,0 +1,260 @@
+/* Register Page Styles - Dark Theme */
+
+.register-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000000;
+    padding: 20px;
+}
+
+.register-container {
+    width: 100%;
+    max-width: 440px;
+}
+
+.register-card {
+    background: #111111;
+    border: 1px solid #333333;
+    border-radius: 12px;
+    padding: 36px 32px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+.register-icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.register-title {
+    color: #f1f5f9;
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+}
+
+.register-subtitle {
+    color: #94a3b8;
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.register-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 13px;
+}
+
+.register-form {
+    margin-bottom: 20px;
+}
+
+.role-selection {
+    margin-bottom: 18px;
+}
+
+.role-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.role-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #000000;
+    border: 1px solid #333333;
+    border-radius: 8px;
+    color: #cbd5e1;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.role-button:hover {
+    border-color: #C3F53C;
+    color: #e2e8f0;
+}
+
+.role-button.active {
+    background: rgba(195, 245, 60, 0.1);
+    border-color: #C3F53C;
+    color: #C3F53C;
+}
+
+.role-button svg {
+    flex-shrink: 0;
+}
+
+.form-field {
+    margin-bottom: 16px;
+}
+
+.field-label {
+    display: block;
+    color: #e2e8f0;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+.field-input {
+    width: 100%;
+    padding: 11px 14px;
+    background: #000000;
+    border: 1px solid #333333;
+    border-radius: 8px;
+    color: #f1f5f9;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.field-input::placeholder {
+    color: #64748b;
+}
+
+.field-input:focus {
+    background: #000000;
+    border-color: #C3F53C;
+    box-shadow: 0 0 0 3px rgba(195, 245, 60, 0.1);
+}
+
+.create-button {
+    width: 100%;
+    padding: 12px 16px;
+    background: #C3F53C;
+    color: #000000;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px -1px rgba(195, 245, 60, 0.3);
+    margin-top: 8px;
+}
+
+.create-button:hover:not(:disabled) {
+    background: #B2E030;
+    transform: scale(1.02);
+}
+
+.create-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.register-footer {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.login-link {
+    color: #C3F53C;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.login-link:hover {
+    color: #B2E030;
+    text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .register-card {
+        padding: 28px 24px;
+    }
+
+    .register-title {
+        font-size: 20px;
+    }
+
+    .register-subtitle {
+        font-size: 13px;
+    }
+
+    .role-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .role-button {
+        padding: 11px 14px;
+        font-size: 13px;
+    }
+
+    .field-input {
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+
+    .field-label {
+        font-size: 12px;
+    }
+
+    .create-button {
+        padding: 11px 14px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 360px) {
+    .register-container {
+        max-width: 100%;
+    }
+
+    .register-card {
+        padding: 24px 20px;
+    }
+
+    .register-icon svg {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Navbar Override for Register Page */
+.navbar.navbar-register {
+    background-color: #000000;
+    border-bottom: 1px solid #333333;
+}
+
+.navbar.navbar-register .navbar-logo {
+    color: #FFFFFF;
+}
+
+.navbar.navbar-register .navbar-link {
+    color: #E5E7EB;
+}
+
+.navbar.navbar-register .navbar-link:hover {
+    color: #C3F53C;
+}
+
+.navbar.navbar-register .btn-primary {
+    background-color: #C3F53C;
+    color: #000000;
+    border-radius: 50px;
+    font-weight: 600;
+}
+
+.navbar.navbar-register .btn-primary:hover {
+    background-color: #B2E030;
+}
