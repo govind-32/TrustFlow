@@ -44,8 +44,11 @@ function Navbar({ user, wallet, onLogout, onWalletConnect }) {
         return `${address.slice(0, 6)}...${address.slice(-4)}`
     }
 
+    const isLoginPage = location.pathname === '/login'
+    const isRegisterPage = location.pathname === '/register'
+
     return (
-        <nav className={`navbar ${isLanding ? 'navbar-landing' : ''}`}>
+        <nav className={`navbar ${isLanding ? 'navbar-landing' : ''} ${isLoginPage ? 'navbar-login' : ''} ${isRegisterPage ? 'navbar-register' : ''}`}>
             <div className="container navbar-content">
                 <Link to="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src={logo} alt="TrustFlow Logo" style={{ height: '28px', width: 'auto' }} />
