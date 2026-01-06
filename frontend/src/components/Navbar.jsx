@@ -1,7 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import logo from '../assets/logo.png' 
 
 function Navbar({ user, wallet, onLogout, onWalletConnect }) {
     const navigate = useNavigate()
+    const location = useLocation()
+    const isLanding = location.pathname === '/'
 
     const connectWallet = async () => {
         if (typeof window.ethereum === 'undefined') {
@@ -42,9 +45,12 @@ function Navbar({ user, wallet, onLogout, onWalletConnect }) {
     }
 
     return (
-        <nav className="navbar">
+        <nav className={`navbar ${isLanding ? 'navbar-landing' : ''}`}>
             <div className="container navbar-content">
-                <Link to="/" className="navbar-logo">TrustFlow</Link>
+                <Link to="/" className="navbar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={logo} alt="TrustFlow Logo" style={{ height: '28px', width: 'auto' }} />
+                    TrustFlow
+                </Link>
 
                 <div className="navbar-nav">
                     {!user ? (
